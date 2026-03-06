@@ -80,7 +80,73 @@ def test_capacity_zero_all_waitlisted_and_promotion_never_happens():
         er.cancel("missing")
 
 
+def test_query_user_not_in_system_returns_none():
+    er = EventRegistration(capacity=2)
+    er.register("u1")
+    er.register("u2")
 
-#################################################################################
-# Add your own additional tests here to cover more cases and edge cases as needed.
-#################################################################################
+    # user never registered
+    assert er.status("u3") == UserStatus("none")
+
+
+def test_cancel_nonexistent_user_raises_notfound():
+    er = EventRegistration(capacity=2)
+    er.register("u1")
+
+    with pytest.raises(NotFound):
+        er.cancel("u2")
+
+
+def test_reregister_after_cancel_allowed():
+    er = EventRegistration(capacity=1)
+
+    er.register("u1")
+    er.cancel("u1")
+
+    # user should now be allowed to register again
+    s = er.register("u1")
+    assert s == UserStatus("registered")
+
+    snap = er.snapshot()
+    assert snap["registered"] == ["u1"]
+    assert snap["waitlist"] == []
+
+
+def test_multiple_promotions_after_sequential_cancels():
+    er = EventRegistration(capacity=1)
+
+    er.register("u1")
+    er.register("u2")  # waitlist
+    er.register("u3")  # waitlist
+    er.register("u4")  # waitlist
+
+    er.cancel("u1")  # promotes u2
+    assert er.status("u2") == UserStatus("registered")
+
+    er.cancel("u2")  # promotes u3
+    assert er.status("u3") == UserStatus("registered")
+
+    snap = er.snapshot()
+    assert snap["registered"] == ["u3"]
+    assert snap["waitlist"] == ["u4"]
+
+
+def test_fifo_waitlist_order_preserved():
+    er = EventRegistration(capacity=2)
+
+    er.register("u1")
+    er.register("u2")
+    er.register("u3")  # waitlist
+    er.register("u4")  # waitlist
+    er.register("u5")  # waitlist
+
+    er.cancel("u1")  # promote u3
+
+    snap = er.snapshot()
+
+    assert snap["registered"] == ["u2", "u3"]
+    assert snap["waitlist"] == ["u4", "u5"]
+
+    # positions should shift correctly
+    assert er.status("u4") == UserStatus("waitlisted", 1)
+    assert er.status("u5") == UserStatus("waitlisted", 2)

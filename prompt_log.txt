@@ -1,6 +1,472 @@
 ## Student Name:
 ## Student ID: 
 
-Prompt #1: {}
-Response #1: {}
+Prompt #1: {You are helping me implement an Event Registration with Waitlist system in Python.
+
+here is the context you need:
+
+---
+
+PROBLEM SUMMARY
+
+the objective of the system is to manage registration for a single event with a fixed capacity.
+
+the system takes 2 inputs:
+- Capacity: non-negative integer, defines the max number of users the event can hold, doesn't change once set
+- User Identifier: unique 3 character string using only uppercase letters and digits, no symbols, no lowercase
+
+after every operation the system returns:
+- the current registered list
+- the current waitlist
+
+for a status query specifically it returns one of:
+- "registered"
+- "waitlisted" + their integer position in the waitlist
+- "not found"
+
+---
+
+FUNCTIONAL REQUIREMENTS
+
+Registration:
+
+FR1. When a register operation is called with a user identifier that does not exist in the registered list or waitlist, and the number of users in the registered list is less than the maximum capacity, the system shall add that user identifier to the registered list.
+
+FR2. When a register operation is called with a user identifier that does not exist in the registered list or waitlist, and the number of users in the registered list equals the maximum capacity, the system shall add that user identifier to the end of the waitlist.
+
+FR3. When a register operation is called with a user identifier that already exists in the registered list or waitlist, the system shall reject the operation and leave the registered list and waitlist unchanged.
+
+FR4. When a register operation is called with a valid user identifier and the maximum capacity is zero, the system shall add that user identifier to the end of the waitlist.
+
+Cancellation:
+
+FR5. When a cancel operation is called with a user identifier that exists in the registered list, and the waitlist is empty, the system shall remove that user identifier from the registered list.
+
+FR6. When a cancel operation is called with a user identifier that exists in the registered list, and the waitlist is non-empty, the system shall remove that user identifier from the registered list and move the user identifier at position one of the waitlist into the registered list.
+
+FR7. When a cancel operation is called with a user identifier that exists in the waitlist, the system shall remove that user identifier from the waitlist and leave the registered list unchanged.
+
+FR8. When a cancel operation is called with a user identifier that does not exist in the registered list or waitlist, the system shall reject the operation and leave the registered list and waitlist unchanged.
+
+Waitlist Ordering:
+
+FR9. When a user identifier is added to the waitlist, the system shall place that identifier at the position after the last existing entry, preserving FIFO order.
+
+FR10. When a promotion occurs, the system shall move exactly the user identifier at position one of the waitlist to the registered list and shift all remaining waitlist entries forward by one position.
+
+Status Query:
+
+FR11. When a query operation is called with a user identifier that exists in the registered list, the system shall return the status "registered" for that identifier.
+
+FR12. When a query operation is called with a user identifier that exists in the waitlist, the system shall return the status "waitlisted" and the integer position of that identifier in the waitlist.
+
+FR13. When a query operation is called with a user identifier that does not exist in the registered list or waitlist, the system shall return the status "not found."
+
+System Invariants:
+
+FR14. When any operation completes, the system shall not allow the number of user identifiers in the registered list to exceed the maximum capacity.
+
+FR15. When any operation completes, the system shall not allow the same user identifier to appear more than once across the registered list and waitlist combined.
+
+FR16. When any operation completes, the system shall not allow the same user identifier to exist in both the registered list and the waitlist at the same time.
+
+FR17. When any operation completes, the system shall return the current registered list and the current waitlist in their correct order.
+
+Re-registration:
+
+FR18. When a cancel operation completes for a given user identifier, the system shall accept that same user identifier as valid input for a subsequent register operation.
+
+Capacity Initialization:
+
+FR19. When the system is initialized with a non-negative integer capacity value, the system shall retain that value unchanged for the lifetime of the event.
+
+FR20. When the system is initialized with a capacity of zero, the system shall operate without error and route all valid register operations directly to the waitlist.
+
+---
+
+CONSTRAINTS
+
+C1. capacity is a non-negative integer fixed at initialization and cannot be changed after
+C2. user identifier is a 3-character string, only uppercase letters and digits, no symbols or lowercase
+C3. each user identifier must be unique across the whole system at all times
+C4. the system manages one event only, one registered list and one waitlist per instance
+C5. the waitlist has no upper bound, unlimited users can be added regardless of capacity
+C6. the system processes one operation at a time, all operations are sequential not concurrent
+C7. a user can only be in one state at a time, either registered, waitlisted, or not in the system
+C8. promotion is automatic when a registered user cancels, no extra input needed
+C9. state does not persist between sessions, everything is in memory for one runtime
+C10. the caller is responsible for passing valid inputs
+
+---
+
+ACCEPTANCE CRITERIA
+
+AC1:
+Given the system is initialized with a maximum capacity of 3
+When three register operations are called with identifiers "A1B", "C2D", and "E3F"
+Then the registered list shall contain ["A1B", "C2D", "E3F"] and the waitlist shall be empty
+Linked Constraint ID(s): C1, C4
+
+AC2:
+Given the registered list is full with identifiers "A1B", "C2D", and "E3F" at capacity 3
+When a register operation is called with identifier "G4H"
+Then the registered list shall remain ["A1B", "C2D", "E3F"] and the waitlist shall contain ["G4H"]
+Linked Constraint ID(s): C1, C5
+
+AC3:
+Given the identifier "A1B" already exists in the registered list
+When a register operation is called again with identifier "A1B"
+Then the system shall reject the operation and the registered list and waitlist shall remain unchanged
+Linked Constraint ID(s): C2, C3
+
+AC4:
+Given the registered list contains ["A1B", "C2D"] at capacity 2 and the waitlist contains ["E3F", "G4H"]
+When a cancel operation is called with identifier "A1B"
+Then the registered list shall contain ["C2D", "E3F"] and the waitlist shall contain ["G4H"]
+Linked Constraint ID(s): C4, C6
+
+AC5:
+Given the waitlist contains ["A1B", "C2D", "E3F"]
+When a cancel operation is called with identifier "C2D"
+Then the waitlist shall contain ["A1B", "E3F"] and the registered list shall remain unchanged
+Linked Constraint ID(s): C6, C7
+
+AC6:
+Given the system is initialized with a maximum capacity of 0
+When a register operation is called with identifier "A1B"
+Then the registered list shall remain empty and the waitlist shall contain ["A1B"]
+Linked Constraint ID(s): C1, C5
+
+AC7:
+Given the registered list contains ["A1B"] at capacity 2 and the waitlist is empty
+When a query operation is called with identifier "A1B"
+Then the system shall return the status "registered" and the registered list and waitlist shall remain unchanged
+Linked Constraint ID(s): C6, C7
+
+AC8:
+Given the waitlist contains ["A1B", "C2D", "E3F"]
+When a query operation is called with identifier "C2D"
+Then the system shall return the status "waitlisted" and the integer position 2
+Linked Constraint ID(s): C6, C7
+
+AC9:
+Given the identifier "Z9Z" does not exist in the registered list or waitlist
+When a query operation is called with identifier "Z9Z"
+Then the system shall return the status "not found" and the registered list and waitlist shall remain unchanged
+Linked Constraint ID(s): C6, C7
+
+AC10:
+Given the registered list contains ["A1B"] at capacity 1 and the waitlist contains ["C2D"]
+When a cancel operation is called with identifier "A1B" followed by a cancel operation with identifier "C2D"
+Then after the first cancel the registered list shall contain ["C2D"] and the waitlist shall be empty, and after the second cancel the registered list shall be empty and the waitlist shall be empty
+Linked Constraint ID(s): C6, C8
+
+AC11:
+Given a user with identifier "A1B" exists in the registered list and cancels
+When a register operation is called again with identifier "A1B"
+Then the system shall accept the operation and place "A1B" in the registered list if space is available, or at the end of the waitlist if capacity is full
+Linked Constraint ID(s): C3, C7
+
+AC12:
+Given a register operation is called with identifier "a1b" which contains a lowercase character
+When the system processes the operation
+Then the system shall reject the operation and leave the registered list and waitlist unchanged
+Linked Constraint ID(s): C2, C10}
+Response #1: {Great — based on your requirements, the core idea is that the system maintains two ordered lists:
+
+registered → users currently in the event
+
+waitlist → users waiting in FIFO order
+
+capacity → fixed integer set during initialization
+
+The logic from the functional requirements maps cleanly to three main operations:
+
+register(user_id)
+
+cancel(user_id)
+
+query(user_id)
+
+Since you prefer guidance instead of full solutions (from your learning preference), I’ll walk you through a clean design structure without immediately giving the entire implementation.}
 --------------------------------------------------
+Prompt #2: {Do any ambiguities or missing clarifications exist?}
+Respose #2: {Yes — overall your specification is very strong, but there are a few minor ambiguities and clarification gaps that could cause different implementations to behave differently. None are catastrophic, but tightening them improves correctness and grading consistency.
+
+I'll separate them into three categories:
+
+Potential ambiguities
+
+Missing clarifications
+
+Minor specification inconsistencies
+
+1. Ambiguity: Order of the Registered List
+
+The spec never explicitly states what ordering rule the registered list follows.
+
+2. Ambiguity: What "reject operation" means
+
+Several requirements say:
+
+the system shall reject the operation
+
+But it does not specify:
+
+Does it return an error?
+
+Does it return a boolean?
+
+Does it only leave state unchanged?
+
+3. Ambiguity: Return format of operations
+
+The spec states:
+
+after every operation the system returns the current registered list and the current waitlist
+
+But it does not define the format.
+
+4. Ambiguity: Query return value
+
+The spec says:
+
+return "waitlisted" + integer position
+
+But the exact structure is unclear.
+
+5. Missing clarification: Identifier validation timing
+
+Constraint:
+
+C10: caller is responsible for passing valid inputs
+
+But AC12 contradicts this slightly:
+
+Given identifier "a1b"
+Then system shall reject operation
+
+So the system must validate identifiers, even though the caller is responsible.
+
+6. Missing clarification: Promotion position in registered list
+
+Promotion behavior is defined but not where the promoted user goes.
+
+Two possible implementations:
+
+Option A (implied by examples):
+
+append to end
+
+Option B:
+
+fill vacated slot
+
+Your acceptance criteria imply append, but this should be explicit.
+
+7. Edge Case: Cancel when capacity = 0
+
+If capacity = 0:
+
+registered list is always empty
+
+all users are in waitlist
+
+8. Missing clarification: Waitlist position indexing
+
+FR12 says:
+
+return position in waitlist
+
+But it doesn't state whether indexing starts at:
+
+0 or 1
+
+9. Missing clarification: Operation return when rejected
+
+If a register or cancel fails, does the system still return the lists?
+
+AC3 implies yes.
+
+But not explicitly stated.
+
+10. Minor wording inconsistency
+
+FR1 and FR2 say:
+
+When a register operation is called with a user identifier that does not exist...
+
+But FR4 says:
+
+When a register operation is called with a valid user identifier...
+
+These should use consistent wording.}
+Prompt #3: {*Same as the last with added changes to improve spec*}
+Response #3: {The specification is largely clear and well-structured, 
+but a few minor issues remain. First, the return structure for operations 
+is slightly inconsistent: the document states that every operation returns 
+a tuple of (registered list, waitlist), but later constraint C13 indicates 
+that an error message is also returned, implying a tuple of (registered list, waitlist, error_message). 
+This creates ambiguity about whether successful operations return two or three values. Second, the return 
+format for the query operation is not fully defined, since the specification lists possible status outputs ("registered", "waitlisted" with position, or "not found") 
+but does not explicitly explain how this status integrates with the overall tuple returned by operations. Third, FR9 describes behavior when cancelling a registered user 
+while the capacity is zero, but this situation is logically unreachable because when capacity is zero all registrations are routed directly to the waitlist, meaning the 
+registered list should always remain empty. Finally, although the system is responsible for validating identifier format, the specification does not clearly state whether 
+this validation must occur for all operations (register, cancel, and query), which could lead to inconsistent handling of invalid identifiers across implementations. These 
+issues are relatively minor and can be resolved with small clarifications to make the specification fully deterministic.}
+
+Prompt #4: {Check this revised Event Registration with Waitlist system specification for ambiguities, contradictions, or missing clarifications.}
+Response #4: {This revised specification is very precise and nearly fully deterministic, and most earlier ambiguities have been resolved. However, 
+a few small issues and clarifications remain that could still improve the specification.
+
+First, there is a minor inconsistency in how the promotion rule is described in FR6. The requirement states that when a registered user cancels 
+and the waitlist is non-empty, the system removes the user from the registered list and appends the user identifier at position 1 of the waitlist 
+to the end of the registered list. However, it does not explicitly state that the promoted user must be removed from the waitlist, although FR10 
+implies that the waitlist shifts forward after promotion. To remove any ambiguity, FR6 should explicitly state that the promoted identifier is 
+removed from the waitlist before being appended to the registered list.
+
+Second, there is a minor ambiguity in acceptance criteria that reference “registered list” without specifying its contents, particularly in AC5, 
+AC8, and AC9. These criteria say the system returns (registered list, ...) without defining what the registered list actually contains at that 
+moment. While this can be inferred from context, acceptance criteria are typically clearer when they explicitly state the expected list contents 
+to avoid interpretation differences during testing.
+
+Third, AC11 is slightly inconsistent with the tuple return format defined earlier. The specification states that every operation returns 
+(registered list, waitlist, message), but AC11 describes the outcome in terms of where "A1B" appears and that the error message is None, 
+rather than explicitly presenting the full returned tuple. This is not logically incorrect, but it deviates from the otherwise consistent pattern used in other acceptance criteria.
+
+Finally, while identifier validation rules are now clearly defined in constraint C10 and reinforced by AC12–AC14, the specification does 
+not explicitly state what the error message should contain when an identifier format is invalid or when an operation is rejected. Because 
+the system always returns an error string for rejected operations, specifying whether error messages must follow a particular format 
+(for example "invalid identifier" or "identifier already exists") would make the behavior even more deterministic for implementation and testing.
+
+Overall, the specification is very strong and implementable, with only small wording improvements needed to remove the remaining minor ambiguities.}
+
+Prompt #5: {Implement the functions in the provided EventRegistration base file one by one.}
+Response #5: {Since you prefer learning with guidance rather than immediately receiving the entire solution, we'll implement the class step-by-step. We'll start with the constructor 
+(__init__), because every other method depends on the internal data structures.}
+
+Prompt #6:
+{Be more detailed when describing how to implement each function.}
+
+Response #6:
+
+{The `__init__(self, capacity: int)` function is responsible for initializing the internal state of the event registration system when a new instance 
+of the class is created. The function should first store the provided `capacity` value in an instance variable such as `self.capacity`, because this 
+value determines the maximum number of users allowed in the registered list and must remain constant throughout the lifetime of the object. After 
+storing the capacity, the function should create two empty lists: one for registered users and one for the waitlist. These can be stored as 
+`self.registered` and `self.waitlist`. The registered list will hold users who successfully obtained a spot in the event, while the waitlist will 
+hold users who attempted to register after the event reached capacity. Both lists must preserve insertion order so that the earliest registered users 
+remain at the front of the list and the waitlist maintains strict FIFO ordering. If desired, the function may also validate that the provided capacity 
+is not negative and raise a `ValueError` if an invalid value is passed. Once these instance variables are created and initialized, the system is ready 
+to process registration, cancellation, and query operations.
+
+The `register(self, user_id: str) -> UserStatus` function handles the process of adding a new user to the event system. The first step should be checking 
+whether the provided `user_id` already exists in the system. This means checking both `self.registered` and `self.waitlist`. If the identifier appears in 
+either list, the function must immediately raise the `DuplicateRequest` exception, because the system invariant requires that a user may not appear more 
+than once in the system at the same time. If the identifier does not already exist, the function must determine whether the event still has available capacity. 
+This is done by comparing `len(self.registered)` with `self.capacity`. If the number of registered users is less than the capacity, the user should be appended 
+to the end of the `self.registered` list using `append()`. Appending preserves deterministic ordering because users are added in the exact order in which registration 
+operations occur. After adding the user, the function should return `UserStatus("registered")` with no waitlist position. If the event is already full (meaning the length 
+of `self.registered` equals the capacity), the user should instead be added to the waitlist by appending the identifier to `self.waitlist`. The position of the user in the 
+waitlist should then be calculated as `len(self.waitlist)` since the list uses zero-based indexing internally but the system requires waitlist positions to be reported 
+using 1-based indexing. The function should then return `UserStatus("waitlisted", position)` where `position` represents the user’s place in the waitlist queue.
+
+The `cancel(self, user_id: str) -> None` function removes a user from the event system. The function must first determine whether the user is currently registered. This can 
+be done by checking if `user_id` is in `self.registered`. If the user is registered, the system should remove them from that list using `remove()` or by locating their index 
+and deleting it. After the removal, the function must check whether the waitlist contains any users waiting for promotion. If `self.waitlist` is not empty, the system must 
+promote the earliest waitlisted user. Because the waitlist is FIFO, the earliest user will always be located at index `0`. The function should remove that user from the waitlist 
+using `pop(0)` and store the returned identifier in a variable such as `promoted_user`. That identifier should then be appended to the end of `self.registered`, ensuring that 
+the promoted user joins the registered list in a deterministic position. If the user is not found in the registered list, the function should check the waitlist to see if the 
+user is waiting. If the identifier appears in `self.waitlist`, the system should remove it using `remove()` and make no other changes to the registered list. This represents a 
+user leaving the waitlist before being promoted. If the user identifier cannot be found in either list, the function should raise the `NotFound` exception because the cancellation 
+request refers to a user that does not exist in the system. The function does not return a value, but it must ensure that the internal state remains consistent after the operation.
+
+The `status(self, user_id: str) -> UserStatus` function allows a user to check their current state in the system. The function should first check whether the identifier appears in 
+the registered list. If the identifier is present in `self.registered`, the user is currently registered for the event and the function should return `UserStatus("registered")`. If the 
+identifier is not registered, the function should then check whether it exists in the waitlist by searching `self.waitlist`. If the identifier appears in the waitlist, the system must 
+calculate the user’s position in the queue. This can be done using `self.waitlist.index(user_id)` which returns the zero-based index of the identifier in the list. Because the specification 
+requires 1-based positions, the returned index must be incremented by one before being stored in the result. The function should then return `UserStatus("waitlisted", position)` where `position` 
+represents the user’s place in line. If the identifier cannot be found in either list, the user is not part of the system and the function should return `UserStatus("none")`. This indicates that 
+the user is neither registered nor waiting.
+
+The `snapshot(self) -> dict` function provides a deterministic view of the internal system state and is typically used for debugging or automated tests. This method 
+should return a dictionary containing the registered list and the waitlist so that external code can inspect the current state of the event system. For example, the dictionary 
+may contain keys such as `"registered"` and `"waitlist"`, with their corresponding values being the lists of identifiers. It is important that the function returns copies of 
+these lists rather than the lists themselves, because returning the original lists would allow external code to modify the internal state of the object unintentionally. 
+To avoid this, the method should create shallow copies of the lists using `list(self.registered)` and `list(self.waitlist)` before returning them. This ensures that the 
+snapshot accurately reflects the state of the system at the time of the call while still protecting the integrity of the internal data structures.}
+
+Prompt #7:
+{Add at least five additional executable tests (with at least two edge cases) that correspond to the acceptance criteria for the Event Registration with Waitlist system.}
+
+Response #7:
+{def test_query_user_not_in_system_returns_none():
+    er = EventRegistration(capacity=2)
+    er.register("u1")
+    er.register("u2")
+
+    # user never registered
+    assert er.status("u3") == UserStatus("none")
+
+
+def test_cancel_nonexistent_user_raises_notfound():
+    er = EventRegistration(capacity=2)
+    er.register("u1")
+
+    with pytest.raises(NotFound):
+        er.cancel("u2")
+
+
+def test_reregister_after_cancel_allowed():
+    er = EventRegistration(capacity=1)
+
+    er.register("u1")
+    er.cancel("u1")
+
+    # user should now be allowed to register again
+    s = er.register("u1")
+    assert s == UserStatus("registered")
+
+    snap = er.snapshot()
+    assert snap["registered"] == ["u1"]
+    assert snap["waitlist"] == []
+
+
+def test_multiple_promotions_after_sequential_cancels():
+    er = EventRegistration(capacity=1)
+
+    er.register("u1")
+    er.register("u2")  # waitlist
+    er.register("u3")  # waitlist
+    er.register("u4")  # waitlist
+
+    er.cancel("u1")  # promotes u2
+    assert er.status("u2") == UserStatus("registered")
+
+    er.cancel("u2")  # promotes u3
+    assert er.status("u3") == UserStatus("registered")
+
+    snap = er.snapshot()
+    assert snap["registered"] == ["u3"]
+    assert snap["waitlist"] == ["u4"]
+
+
+def test_fifo_waitlist_order_preserved():
+    er = EventRegistration(capacity=2)
+
+    er.register("u1")
+    er.register("u2")
+    er.register("u3")  # waitlist
+    er.register("u4")  # waitlist
+    er.register("u5")  # waitlist
+
+    er.cancel("u1")  # promote u3
+
+    snap = er.snapshot()
+
+    assert snap["registered"] == ["u2", "u3"]
+    assert snap["waitlist"] == ["u4", "u5"]
+
+    # positions should shift correctly
+    assert er.status("u4") == UserStatus("waitlisted", 1)
+    assert er.status("u5") == UserStatus("waitlisted", 2)}
