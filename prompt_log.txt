@@ -470,3 +470,41 @@ def test_fifo_waitlist_order_preserved():
     # positions should shift correctly
     assert er.status("u4") == UserStatus("waitlisted", 1)
     assert er.status("u5") == UserStatus("waitlisted", 2)}
+
+
+
+Prompt 8:
+I am building an Event Registration with Waitlist system in Python. Before I ask you to generate any code, I want you to review my requirements and constraints and tell me if anything is missing, ambiguous, or leaves edge cases unhandled. Do not generate any code yet.
+
+System Description:
+The system manages sign-ups for a single event with a fixed capacity. Users can register, be placed on a waitlist, cancel, and query their status. When a registered user cancels, the earliest waitlisted user is automatically promoted.
+
+Personas:
+Jane Adams is a busy professional who trusts the system to handle everything automatically and wants minimal interaction and no repeated messages.
+Mo Rodriguez is a user with accessibility needs who needs clear explanations for every system action, gets stressed by silent failures, and expects consistent deterministic behavior.
+
+Constraints:
+C1: The system must automatically promote the earliest waitlisted user upon cancellation without requiring any user input.
+C2: The system must produce the same outcome for identical sequences of operations every time.
+C3: The system must produce exactly one response per operation and never send duplicate messages.
+C4: The system must return a reason message whenever it rejects a user action.
+C5: The system must always return either a success status or a raised error and must never silently do nothing.
+C6: The system must apply FIFO ordering consistently so identical inputs always produce the same waitlist order.
+C7: The system must handle edge cases such as capacity zero and unknown user queries by returning an explicit status.
+C8: The system must never prompt the user to manually resolve a conflict.
+
+Acceptance Criteria:
+AC1: Given capacity 2 and 2 registered users, when a third registers, return waitlisted at position 1.
+AC2: Given capacity 1 with 1 registered and 1 waitlisted, when registered cancels, waitlisted is auto-promoted.
+AC3: Given an already registered user, when they register again, raise DuplicateRequest with a reason message.
+AC4: Given a user not in the system, when cancel is called, raise NotFound with a reason message.
+AC5: Given capacity 0, when any user registers, return waitlisted at position 1.
+AC6: Given a user who cancelled, when they re-register, treat them as a new user.
+AC7: Given 3 waitlisted users A, B, C, when the same operations repeat from identical state, promotion order is always identical.
+AC8: Given a user who never interacted, when status is queried, return state "none" without error.
+
+Please identify any missing constraints, ambiguous requirements, or unhandled edge cases.
+
+Response 8: GPT identified 8 issues: user_id case sensitivity undefined, status states not explicitly listed, negative capacity not in requirements, position shifting after waitlisted cancel unspecified, promotion messaging ambiguous relative to C3, data consistency rule implicit, re-registration end-of-waitlist behavior unclear, and atomicity of promotion during cancel not stated.
+
+Decision: Accept all 8 points. Requirements updated in requirements.txt under Revision Notes 1 through 8.
