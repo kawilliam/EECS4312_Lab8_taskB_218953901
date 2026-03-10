@@ -1,37 +1,19 @@
 ## Student Name: Kyle Williamson
 ## Student ID: 218953901
-
 """
-Task B: Event Registration with Waitlist (Stub)
-In this lab, you will design and implement an Event Registration with Waitlist system using an LLM assistant as your primary programming collaborator. 
-You are asked to implement a Python module that manages registration for a single event with a fixed capacity. 
-The system must:
-•	Accept a fixed capacity.
-•	Register users until capacity is reached.
-•	Place additional users into a FIFO waitlist.
-•	Automatically promote the earliest waitlisted user when a registered user cancels.
-•	Prevent duplicate registrations.
-•	Allow users to query their current status.
+Task: Event Registration with Waitlist (Lab 9 Updated)
 
-The system must ensure that:
-•	The number of registered users never exceeds capacity.
-•	Waitlist ordering preserves FIFO behavior.
-•	Promotions occur deterministically under identical operation sequences.
-
-The module must preserve the following invariants:
-•	A user may not appear more than once in the system.
-•	A user may not simultaneously exist in multiple states.
-•	The system state must remain consistent after every operation.
-
-The system must correctly handle non-trivial scenarios such as:
-•	Multiple cancellations in sequence.
-•	Users attempting to re-register after canceling.
-•	Waitlisted users canceling before promotion.
-•	Capacity equal to zero.
-•	Simultaneous or rapid consecutive operations.
-•	Queries during state transitions.
-
-The output consists of the updated registration state and ordered lists of registered and waitlisted users after each operation.
+Updates from Lab 9 persona-based constraints:
+- C4/FR20: All rejections now return a reason message via exception text.
+- C5/FR21: cancel() now returns a result dict confirming success and any promotion.
+- C3/FR22: Exactly one response per operation. Promoted user status only visible via status().
+- C4/FR23: cancel() includes promotion explanation in its return value.
+- FR9: Valid states are explicitly "registered", "waitlisted", "none".
+- FR13: Re-registering user joins end of waitlist as a new user.
+- FR15: Promotion happens atomically within cancel().
+- FR16: User cannot exist in both lists simultaneously.
+- A1: user_id comparisons are case-sensitive.
+- A9: Negative capacity rejected with ValueError.
 """
 
 from dataclasses import dataclass
@@ -88,7 +70,10 @@ class EventRegistration:
             DuplicateRequest if user already exists (registered or waitlisted)
         """
         if user_id in self.registered or user_id in self.waitlist:
-            raise DuplicateRequest(f"{user_id} is already registered or waitlisted")
+            raise DuplicateRequest(
+                f"Registration rejected: '{user_id}' is already in the system. "
+                f"A user may not register more than once."
+            )
         
         if len(self.registered) < self.capacity:
             self.registered.append(user_id)
@@ -97,7 +82,7 @@ class EventRegistration:
         self.waitlist.append(user_id)
         return UserStatus("waitlisted",len(self.waitlist))
 
-    def cancel(self, user_id: str) -> None:
+    def cancel(self, user_id: str) -> dict:
         """
         Cancel a user:
           - if registered -> remove and promote earliest waitlisted user (if any)
@@ -108,15 +93,32 @@ class EventRegistration:
             NotFound (if required by handout)
         """
         if not (user_id in self.registered or user_id in self.waitlist):
-            raise NotFound(f"{user_id} not found in registered or waitlisted users")
-        
+            raise NotFound(
+                f"Cancellation rejected: '{user_id}' was not found in the system. "
+                f"No action was taken."
+            )
+        promoted_user = None
         if user_id in self.registered:
             self.registered.remove(user_id)
             if self.waitlist:
                 promoted_user = self.waitlist.pop(0)
                 self.registered.append(promoted_user)
-        if user_id in self.waitlist:
+        elif user_id in self.waitlist:
             self.waitlist.remove(user_id)
+
+        if promoted_user:
+            message = (
+                f"'{user_id}' has been removed from registered. "
+                f"'{promoted_user}' has been automatically promoted from the waitlist."
+            )
+        else:
+            message = f"'{user_id}' has been successfully removed from the system."
+
+        return {
+            "cancelled": user_id,
+            "promoted": promoted_user,
+            "message": message
+        }
         
 
     def status(self, user_id: str) -> UserStatus:
