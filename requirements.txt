@@ -16,7 +16,7 @@ Primary goal of the system: To reliably manage event registrations and waitlist 
 
 ## 2. Assumptions - List assumptions about the environment, users, or inputs.
 
-A1: All user_id values are non-empty strings and the caller is responsible for providing valid string inputs.
+A1: All user_id values are non-empty strings, comparisons are case-sensitive meaning "User1" and "user1" are treated as different users, and the caller is responsible for passing clean valid strings.
 
 A2: The capacity value is set once at initialization and does not change during the lifetime of the system.
 
@@ -31,6 +31,8 @@ A6: The system is responsible for all conflict resolution and the caller never n
 A7: A capacity of zero is a valid input and means all users will be waitlisted immediately.
 
 A8: The order in which register() calls are processed determines waitlist and registration order.
+
+A9: Negative capacity values are invalid and must be rejected with a ValueError at initialization.
 
 ---
 
@@ -52,7 +54,7 @@ FR7: The system shall allow a user to cancel their registration whether they are
 
 FR8: The system shall allow a user to query their current status at any time.
 
-FR9: The system shall return a status of "registered", "waitlisted", or "none" for any status query.
+FR9: The system shall return a status of "registered", "waitlisted", or "none" for any status query. The only valid states are "registered", "waitlisted", and "none". When state is "waitlisted" a 1-based position must always be included.
 
 FR10: The system shall return a 1-based waitlist position when a user is waitlisted.
 
@@ -60,13 +62,13 @@ FR11: The system shall ensure the number of registered users never exceeds capac
 
 FR12: The system shall handle a capacity of zero by placing all users directly onto the waitlist.
 
-FR13: The system shall allow a user to re-register after previously cancelling.
+FR13: The system shall allow a user to re-register after previously cancelling. A user who re-registers after cancelling is treated as a brand new user and joins the end of the waitlist if capacity is full.
 
 FR14: The system shall allow a waitlisted user to cancel before being promoted.
 
-FR15: The system shall remain in a consistent state after every operation.
+FR15: The system shall remain in a consistent state after every operation. Promotion must happen atomically within the cancel operation and status queries must always reflect the post-operation state immediately.
 
-FR16: The system shall never place a user in more than one state at the same time.
+FR16: The system shall never place a user in more than one state at the same time. A user cannot exist in both the registered list and the waitlist simultaneously under any operation sequence.
 
 FR17: The system shall produce a deterministic outcome for identical sequences of operations.
 
@@ -78,7 +80,7 @@ FR20: The system shall return a reason whenever it rejects a user action such as
 
 FR21: The system shall never silently drop a request and must always return either a success status or an error for every operation. [Derived from C5 - Mo]
 
-FR22: The system shall produce exactly one response per operation so the user is never sent duplicate or repeated messages. [Derived from C3 - Jane]
+FR22: The system shall produce exactly one response per operation so the user is never sent duplicate or repeated messages. When a cancel triggers a promotion, no additional response is generated for the promoted user. The promoted user/'s new status is only visible via a subsequent status query. [Derived from C3 - Jane]
 
 FR23: The system shall include an explanation when a user is promoted from the waitlist to registered so the user understands why their status changed. [Derived from C4 - Mo]
 
@@ -172,7 +174,7 @@ Expected system behavior: The system raises a DuplicateRequest error with a non-
 EC4: A cancellation is requested for a user that does not exist in the system.
 Expected system behavior: The system raises a NotFound error with a non-empty reason message.
 
-EC5: A waitlisted user cancels before being promoted leaving the remaining waitlist positions to shift up by one.
+EC5: The system removes the user and all users behind them shift up by one position immediately and the updated positions are reflected in any subsequent status query.
 Expected system behavior: The system removes the user and recalculates all remaining waitlist positions in FIFO order.
 
 EC6: A user cancels and then attempts to re-register and must be treated as a new user with no memory of their previous state.
@@ -211,4 +213,50 @@ FR23 -> C4 -> AC2
 FR24 -> C6, C7 -> AC7, AC8
 ---
 ## Revision Notes
-(This section will be updated with any requirement changes discovered during Tasks 6 and 8.)
+Revision Note 1
+Requirement updated: A1 - User identity rules
+Reason: LLM identified that user_id case sensitivity and whitespace handling were never defined.
+Action: Added assumption that user_id comparisons are case-sensitive and the caller is responsible for passing clean non-empty strings.
+Triggered by: LLM feedback
+
+Revision Note 2
+Requirement updated: FR9 - Status definitions
+Reason: LLM identified that the full set of valid states was implicit rather than explicit.
+Action: Clarified that the only valid states are "registered", "waitlisted", and "none" and that waitlist position is always included when state is "waitlisted".
+Triggered by: LLM feedback
+
+Revision Note 3
+Requirement updated: A1 - Negative capacity
+Reason: The system already rejects negative capacity in code but this was never written as a requirement.
+Action: Added explicit constraint that negative capacity values must be rejected with a ValueError at initialization.
+Triggered by: LLM feedback
+
+Revision Note 4
+Requirement updated: EC5 - Waitlisted user cancels
+Reason: LLM identified that position shifting after a waitlisted user cancels was unspecified.
+Action: Specified that when a waitlisted user cancels all users behind them shift up by one position immediately.
+Triggered by: LLM feedback
+
+Revision Note 5
+Requirement updated: C3 and FR22 - Promotion messaging
+Reason: LLM identified ambiguity about whether a promoted user receives a separate response when auto-promotion occurs.
+Action: Clarified that cancel returns nothing on success and the promoted user/'s new status is only visible via a subsequent status query. No extra response is generated for the promoted user.
+Triggered by: LLM feedback
+
+Revision Note 6
+Requirement updated: FR16 - Data consistency
+Reason: LLM noted that the rule preventing a user from existing in multiple states simultaneously was implicit.
+Action: Made explicit that the system must guarantee a user cannot exist in both the registered list and the waitlist at the same time under any operation sequence.
+Triggered by: LLM feedback
+
+Revision Note 7
+Requirement updated: FR13 - Re-registration after cancel
+Reason: LLM identified that it was unclear whether a re-registering user joins the end of the waitlist or retains any previous position.
+Action: Specified that a user who cancels and re-registers is treated as a brand new user and joins the end of the waitlist if capacity is full.
+Triggered by: LLM feedback
+
+Revision Note 8
+Requirement updated: FR15 - State transition guarantees
+Reason: LLM identified that it was unclear whether promotion happens atomically within the cancel operation.
+Action: Specified that promotion must happen atomically within the cancel operation and that status queries must always reflect the post-operation state immediately.
+Triggered by: LLM feedback
