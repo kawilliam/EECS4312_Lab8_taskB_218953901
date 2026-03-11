@@ -150,3 +150,12 @@ def test_fifo_waitlist_order_preserved():
     # positions should shift correctly
     assert er.status("u4") == UserStatus("waitlisted", 1)
     assert er.status("u5") == UserStatus("waitlisted", 2)
+
+def test_cancel_returns_promotion_message():
+    er = EventRegistration(1)
+    er.register("u1")
+    er.register("u2")
+    result = er.cancel("u1")
+    assert result["promoted"] == "u2"
+    assert "u2" in result["message"]
+    assert len(result["message"]) > 0
